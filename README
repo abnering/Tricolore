@@ -1,0 +1,5 @@
+The input data
+    user_id,all_hist,strong_history,mid_history,weak_history,pos_i,hist_len,neg_i,m_labels,neg_labels
+    eg:
+    [0,[1, 3, ... n], [3, ... n], [4, ... n],  [5, ... n], k, 50, l, [0,0,1]]
+    mlabel is multi_label [0,0,1 ] as not strong not mid ,is weak

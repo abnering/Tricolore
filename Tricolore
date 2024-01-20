@@ -1,0 +1,162 @@
+"""
+Created on 01 13, 2024
+
+evaluate model
+@author: abnerzxzhao
+"""
+
+import tensorflow as tf
+
+from tensorflow.keras import Model
+from tensorflow.keras.layers import Embedding, Input
+from tensorflow.keras.regularizers import l2
+
+from modules import *
+
+
+class Tricolore(Model):
+    def __init__(self, feature_columns, maxlen=20, mode='inner', gamma=0.5, w=0.5, embed_reg=1e-6, **kwargs):
+        """
+        AttRec
+        :param feature_columns: A feature columns list. user + seq
+        :param maxlen: A scalar. In the paper, maxlen is L, the number of latest items.
+        :param gamma: A scalar. if mode == 'dist', gamma is the margin.
+        :param mode: A string. inner or dist.
+        :param w: A scalar. The weight of short interest.
+        :param embed_reg: A scalar. The regularizer of embedding.
+        """
+        super(MIND, self).__init__(**kwargs)
+        # maxlen
+        self.maxlen = maxlen
+        # w
+        self.w = w
+        self.gamma = gamma
+        self.mode = mode
+        # feature columns
+        self.item_fea_col = feature_columns[0]
+        # embed_dim
+        self.embed_dim = self.item_fea_col['embed_dim']
+        # user embedding
+        self.item_embedding = Embedding(input_dim=self.item_fea_col['feat_num'],
+                                        input_length=1,
+                                        output_dim=self.item_fea_col['embed_dim'],
+                                        mask_zero=True,
+                                        embeddings_initializer='uniform',
+                                        embeddings_regularizer=l2(embed_reg))
+        self.user_item_embedding = Embedding(input_dim=self.item_fea_col['feat_num'],input_length=1,output_dim=self.item_fea_col['embed_dim'],
+                                    mask_zero=True,embeddings_initializer='uniform',embeddings_regularizer=l2(embed_reg))
+        self.like_item_embedding = Embedding(input_dim=self.item_fea_col['feat_num'],input_length=1,output_dim=self.item_fea_col['embed_dim'],mask_zero=True,
+                                     embeddings_initializer='uniform', embeddings_regularizer=l2(embed_reg))
+        self.share_item_embedding = Embedding(input_dim=self.item_fea_col['feat_num'],input_length=1,output_dim=self.item_fea_col['embed_dim'],mask_zero=True,
+                                     embeddings_initializer='uniform', embeddings_regularizer=l2(embed_reg))
+        self.follow_item_embedding = Embedding(input_dim=self.item_fea_col['feat_num'],input_length=1,output_dim=self.item_fea_col['embed_dim'],mask_zero=True,
+                                     embeddings_initializer='uniform', embeddings_regularizer=l2(embed_reg))
+        self.fav_item_embedding = Embedding(input_dim=self.item_fea_col['feat_num'],input_length=1,output_dim=self.item_fea_col['embed_dim'],mask_zero=True,
+                                     embeddings_initializer='uniform', embeddings_regularizer=l2(embed_reg))
+        self.bigtime_item_embedding = Embedding(input_dim=self.item_fea_col['feat_num'],input_length=1,output_dim=self.item_fea_col['embed_dim'],mask_zero=True,
+                                     embeddings_initializer='uniform', embeddings_regularizer=l2(embed_reg))
+        self.comment_item_embedding = Embedding(input_dim=self.item_fea_col['feat_num'],input_length=1,output_dim=self.item_fea_col['embed_dim'],mask_zero=True,
+                                     embeddings_initializer='uniform', embeddings_regularizer=l2(embed_reg))
+ 
+
+        self.strong_M_vec = DNN_L(hidden = "64",name="strong")
+        self.strong_W =  tf.Variable(initial_value=tf.random.uniform(shape=(64,64)),name="strong_para",shape=(64,64),dtype=tf.float32,trainable = True)
+
+        self.mid_M_vec = DNN_L(hidden = "64",name="mid")
+        self.mid_W = tf.Variable(initial_value=tf.random.uniform(shape=(64,64)),name="mid_para",shape=(64,64),dtype=tf.float32,trainable = True)
+
+        self.weak_M_vec = DNN_L(hidden = "64",name="weak")
+        self.weak_W = tf.Variable(initial_value=tf.random.uniform(shape=(64,64)),name="weak_para",shape=(64,64),dtype=tf.float32,trainable = True)
+        
+
+
+def call(self, inputs, **kwargs):
+        # input
+        #mlabel is multi_label [0,0,1 ] as not strong not mid ,is weak
+        user_id,all_hist,strong_history,mid_history,weak_history,pos_i,hist_len,neg_i,m_labels = inputs
+        seq_inputs = all_hist
+        pos_inputs = pos_i
+        neg_inputs = neg_i
+        other_labels = m_labels
+
+        mask = tf.cast(tf.not_equal(seq_inputs, 0), dtype=tf.float32)  # (None, maxlen)
+        mask = tf.expand_dims(mask,-1)
+        
+        strong_mask = tf.cast(tf.not_equal(strong_history,0),dtype=tf.float32)
+        strong_mask =  tf.expand_dims(strong_mask,-1)
+
+        mid_mask =  tf.cast(tf.not_equal(mid_history,0),dtype=tf.float32)
+        mid_mask = tf.expand_dims(mid_mask,-1)
+
+        weak_mask =  tf.cast(tf.not_equal(weak_history,0),dtype=tf.float32)
+        weak_mask = tf.expand_dims(weak_mask,-1)
+
+    
+        seq_embed = self.user_item_embedding(seq_inputs)*mask  # (None, maxlen, dim)
+        strong_seq_embed = self.user_item_embedding(strong_history)*strong_mask
+        mid_seq_embed = self.user_item_embedding(mid_history)*mid_mask  # (None, maxlen, dim)
+        weak_seq_embed = self.user_item_embedding(weak_history)*weak_mask  # (None, maxlen, dim)
+
+
+        pos_embed = self.item_embedding(tf.squeeze(pos_inputs, axis=-1))  # (None, dim)
+        neg_embed = self.item_embedding(tf.squeeze(neg_inputs, axis=-1))  # (None, dim)
+        max_len = seq_embed.get_shape()[1]
+
+        user_embedding_final =  tf.reduce_mean(seq_embed,axis=1)
+        strong_emb =  tf.reduce_mean(strong_seq_embed,axis=1)
+        mid_emb =  tf.reduce_mean(mid_seq_embed,axis=1)
+        weak_emb =  tf.reduce_mean(weak_seq_embed,axis=1)
+
+        user_embed = user_embedding_final
+        user_embed = tf.clip_by_norm(user_embedding_final, 5.0,  axes=1)
+        pos_embed = tf.clip_by_norm(pos_embed, 5.0, axes=1)
+        neg_embed = tf.clip_by_norm(neg_embed, 5.0, axes=1)
+        user_embedding_final = tf.math.l2_normalize(user_embedding_final,axis=1)
+        pos_embed =  tf.math.l2_normalize(pos_embed,axis=1)
+        neg_embed =  tf.math.l2_normalize(neg_embed,axis=1)
+
+
+        strong_user_embed = self.strong_M_vec(user_embed) + strong_emb
+        strong_user_embed  = strong_emb +   tf.sigmoid(tf.matmul(strong_emb,self.strong_W))*user_embed
+
+        mid_user_embed = self.mid_M_vec(user_embed) + mid_emb
+        mid_user_embed  = mid_emb +  tf.sigmoid(tf.matmul(mid_emb,self.mid_W))*user_embed
+
+        weak_user_embed = self.weak_M_vec(user_embed) + weak_emb
+        weak_user_embed = weak_emb + tf.sigmoid(tf.matmul(weak_emb,self.weak_W))*user_embed
+
+
+        other_labels = m_labels
+        j = 0
+        strong_label = tf.squeeze(tf.cast(other_labels[:, j:j+1],dtype=tf.float32))
+        j += 1
+        mid_label =  tf.squeeze(tf.cast(other_labels[:, j:j+1],dtype=tf.float32))
+        j += 1
+        weak_label =  tf.squeeze(tf.cast(other_labels[:, j:j+1],dtype=tf.float32))
+
+        final_layer_neg =  self.DOT_Layer([user_embed,neg_embed])
+        final_layer =   self.DOT_Layer([user_embed,pos_embed])
+        base_cost =  tf.reduce_mean(tf.nn.relu(final_layer_neg - final_layer + 0.1)*(0.5 + strong_label*0.3 + 0.1*mid_label + 0.1*weak_label))
+
+        pos_strong_score = tf.sigmoid(final_layer)*self.DOT_Layer([strong_user_embed,pos_embed])
+        neg_strong_score = tf.sigmoid(final_layer_neg)*self.DOT_Layer([strong_user_embed,neg_embed])
+        string_loss = tf.reduce_mean(tf.nn.relu(neg_strong_score - pos_strong_score + 0.1))
+
+
+        pos_mid_score = tf.sigmoid(final_layer)*self.DOT_Layer([mid_user_embed,pos_embed])
+        neg_mid_score = tf.sigmoid(final_layer_neg)*self.DOT_Layer([mid_user_embed,neg_embed])
+        mid_loss = tf.reduce_mean(tf.nn.relu(neg_mid_score - pos_mid_score + 0.1))
+
+
+        pos_weak_score = tf.sigmoid(final_layer)*self.DOT_Layer([weak_user_embed,pos_embed])
+        neg_weak_score = tf.sigmoid(final_layer_neg)*self.DOT_Layer([weak_user_embed,neg_embed])
+        weak_loss = tf.reduce_mean(tf.nn.relu(neg_weak_score - pos_weak_score + 0.1))
+
+        loss = base_cost
+        loss = loss + 0.5*mid_loss
+        loss = loss + 0.1*weak_loss
+        loss = loss + 3.0*string_loss
+        self.add_loss(loss)
+        opt_score = final_layer
+        neg_score = final_layer_neg
+        return opt_score,neg_score

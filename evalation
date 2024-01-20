@@ -1,0 +1,152 @@
+"""
+Created on 01 13, 2024
+
+evaluate model
+
+@author: abnerzxzhao
+"""
+import pandas as pd
+import numpy as np
+import math
+
+def getHit(df):
+    """
+    calculate hit rate
+    :return:
+    """
+    if sum(df['pred']) < _K:
+        return 1
+    else:
+        return 0
+
+
+def getNDCG(df):
+    """
+    calculate NDCG
+    :return:
+    """
+    if sum(df['pred']) < _K:
+        return 1 / np.log(sum(df['pred']) + 2)
+    else:
+        return 0.
+
+
+def getMRR(df):
+    """
+    calculate MRR
+    :return:
+    """
+    return 1 / (sum(df['pred']) + 1)
+
+
+def get_kk(a,nn):
+    k = 0
+    rr = 0
+    for j in nn:
+        if a == j:
+            rr = k
+        k += 1  
+    return rr
+
+
+def get_eval_K(pos,neg,k):
+    ret = []
+    ndcg = []
+    mrr = []
+    for p in pos:
+        neg1 = []
+        neg1.extend(neg)
+        neg1.append(p)
+        sort_neg = sorted(neg1,reverse = True)
+        cur_i = get_kk(p,sort_neg)
+        #cur_i = sort_neg.index(p)
+        mrr_score = 0.0
+        ndcg_score = 0.0
+        if cur_i < k:
+            ret.append(1)
+            mrr_score = 1.0/(cur_i + 1.0)
+            ndcg_score = math.log(2) / math.log(cur_i+2)
+        else:
+            ret.append(0)
+        mrr.append(mrr_score)
+        ndcg.append(ndcg_score)
+
+    return ret,mrr,ndcg
+
+
+
+def evaluate_model(model, test, K,KK):
+    """
+    evaluate model
+    :param model: model
+    :param test: test set
+    :param K: top K
+    :return: hit rate, ndcg
+    """
+    global _K
+    _K = K
+    test_X = test
+    # predict
+    all_scores = model.predict(test_X)
+    print ("all_score:",all_scores)
+    pos_score = list(all_scores[0])
+    neg_score = list(all_scores[1])
+    # create dataframe
+    #test_df = pd.DataFrame([test_X[0],test_X[1],test_X[2]], columns=['user_id','pos_score','neg_score'])
+    #print (test_X)
+    #user_id,hist_i, pos_i,hist_len,neg_i = test_X
+    user_id,all_hist,strong_history,mid_history,weak_history,pos_i,hist_len,neg_i,m_labels = test_X
+    index2uid = {}
+    uid2opt = {}
+    uid2neg = {}
+    i = 0
+    for ii in user_id:
+        index2uid[i] = ii
+        i+=1
+    for ii in index2uid:
+        cur_i = ii
+        cur_u = index2uid[cur_i]
+        cur_pos_id = pos_i[cur_i]
+        cur_opt_score = pos_score[cur_i]
+
+        cur_neg_score = neg_score[cur_i]
+        cur_key = str(cur_u) + ":" + str(cur_pos_id)
+        if cur_key not in uid2opt:
+            uid2opt[cur_key] = set()
+        uid2opt[cur_key].add(cur_opt_score)
+        if cur_key not in uid2neg:
+            uid2neg[cur_key] = set()
+        uid2neg[cur_key].add(cur_neg_score)
+    ALLHIT10 = []
+    ALLNDCG10 = []
+    ALLMRR10 = []
+    for cur_k in KK:
+        Hit10 = []
+        NDCG10 = []
+        MRR10 = []
+        ALLHIT10.append(Hit10)
+        ALLNDCG10.append(NDCG10)
+        ALLMRR10.append(MRR10)
+    for u in uid2opt:
+        cur_opt_score = list(uid2opt[u])
+        cur_neg_score = list(uid2neg[u])
+        #print (cur_opt_score,cur_neg_score)
+        sub_ii = 0
+        for cur_kkk in KK:
+            hit,mrr,ndcg = get_eval_K(cur_opt_score,cur_neg_score,cur_kkk)
+            #print (cur_kkk,hit,mrr,ndcg)
+            ALLHIT10[sub_ii].extend(hit)
+            ALLNDCG10[sub_ii].extend(ndcg)
+            ALLMRR10[sub_ii].extend(mrr)
+            sub_ii += 1
+    ret1 = []
+    ret2 = []
+    ret3 = []
+    print (KK)
+    for i in range(len(KK)):
+        ret1.append(np.mean(ALLHIT10[i]))
+        ret2.append(np.mean(ALLNDCG10[i]))
+        ret3.append(np.mean(ALLMRR10[i]))
+         
+    return ret1,ret2,ret3
+
