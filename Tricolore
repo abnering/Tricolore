@@ -1,8 +1,7 @@
 """
 Created on 01 13, 2024
-
-evaluate model
-@author: abnerzxzhao
+ model
+@author: abnerzxzhao, xiaozhou
 """
 
 import tensorflow as tf
@@ -45,18 +44,7 @@ class Tricolore(Model):
                                         embeddings_regularizer=l2(embed_reg))
         self.user_item_embedding = Embedding(input_dim=self.item_fea_col['feat_num'],input_length=1,output_dim=self.item_fea_col['embed_dim'],
                                     mask_zero=True,embeddings_initializer='uniform',embeddings_regularizer=l2(embed_reg))
-        self.like_item_embedding = Embedding(input_dim=self.item_fea_col['feat_num'],input_length=1,output_dim=self.item_fea_col['embed_dim'],mask_zero=True,
-                                     embeddings_initializer='uniform', embeddings_regularizer=l2(embed_reg))
-        self.share_item_embedding = Embedding(input_dim=self.item_fea_col['feat_num'],input_length=1,output_dim=self.item_fea_col['embed_dim'],mask_zero=True,
-                                     embeddings_initializer='uniform', embeddings_regularizer=l2(embed_reg))
-        self.follow_item_embedding = Embedding(input_dim=self.item_fea_col['feat_num'],input_length=1,output_dim=self.item_fea_col['embed_dim'],mask_zero=True,
-                                     embeddings_initializer='uniform', embeddings_regularizer=l2(embed_reg))
-        self.fav_item_embedding = Embedding(input_dim=self.item_fea_col['feat_num'],input_length=1,output_dim=self.item_fea_col['embed_dim'],mask_zero=True,
-                                     embeddings_initializer='uniform', embeddings_regularizer=l2(embed_reg))
-        self.bigtime_item_embedding = Embedding(input_dim=self.item_fea_col['feat_num'],input_length=1,output_dim=self.item_fea_col['embed_dim'],mask_zero=True,
-                                     embeddings_initializer='uniform', embeddings_regularizer=l2(embed_reg))
-        self.comment_item_embedding = Embedding(input_dim=self.item_fea_col['feat_num'],input_length=1,output_dim=self.item_fea_col['embed_dim'],mask_zero=True,
-                                     embeddings_initializer='uniform', embeddings_regularizer=l2(embed_reg))
+       
  
 
         self.strong_M_vec = DNN_L(hidden = "64",name="strong")
