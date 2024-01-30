@@ -2,7 +2,7 @@
 Created on 01 13, 2024
 
 evaluate model
-@author: abnerzxzhao
+@author: abnerzxzhao, xiaozhou
 """
 
 import tensorflow as tf
